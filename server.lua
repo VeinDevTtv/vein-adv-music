@@ -1,10 +1,9 @@
 -- server.lua
 local QBCore = exports['qb-core']:GetCoreObject()
 
--- Server-side audio caching (simple implementation)
+-- Server–side audio caching (simple example)
 local AudioCache = {}
 
--- Save performance data to database and cache the track if needed
 RegisterNetEvent('music:server:SavePerformance', function(performanceData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -24,7 +23,6 @@ RegisterNetEvent('music:server:SavePerformance', function(performanceData)
     end
 end)
 
--- Donation event: donor sends money to an artist
 RegisterNetEvent('music:server:SendDonation', function(donationData)
     local src = source
     local donor = QBCore.Functions.GetPlayer(src)
@@ -42,7 +40,6 @@ RegisterNetEvent('music:server:SendDonation', function(donationData)
     end
 end)
 
--- Record contract signing
 RegisterNetEvent('music:server:SignRecordContract', function(contractData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -58,7 +55,6 @@ RegisterNetEvent('music:server:SignRecordContract', function(contractData)
     end
 end)
 
--- Concert ticket purchase
 RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -72,7 +68,6 @@ RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     end
 end)
 
--- Song request handling
 RegisterNetEvent('music:server:SongRequest', function(requestData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -82,24 +77,20 @@ RegisterNetEvent('music:server:SongRequest', function(requestData)
     end
 end)
 
--- Song skipping event (for DJs/performers)
 RegisterNetEvent('music:server:SkipSong', function()
     TriggerClientEvent('music:client:SkipSong', -1)
 end)
 
--- Rap battle event (placeholder)
 RegisterNetEvent('music:server:StartRapBattle', function(battleData)
     local src = source
     TriggerClientEvent('music:client:StartRapBattle', -1, battleData)
 end)
 
--- Live talk show event (placeholder)
 RegisterNetEvent('music:server:StartTalkShow', function(showData)
     local src = source
     TriggerClientEvent('music:client:StartTalkShow', -1, showData)
 end)
 
--- Update performance rating (scale 1-10)
 RegisterNetEvent('music:server:UpdatePerformanceRating', function(ratingData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -116,7 +107,6 @@ RegisterNetEvent('music:server:UpdatePerformanceRating', function(ratingData)
     end
 end)
 
--- Stage Effects events: broadcast to all clients
 RegisterNetEvent('music:server:TriggerLightingEffects', function()
     TriggerClientEvent('music:client:TriggerLightingEffects', -1)
 end)

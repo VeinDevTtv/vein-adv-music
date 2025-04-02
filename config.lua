@@ -15,7 +15,7 @@ Config.DB = {
     PerformanceRatings = "music_performance_ratings",
 }
 
--- Instrument settings: defines animation dictionaries, animation names, and associated prop models
+-- Instrument settings: animation dictionaries, animation names, and prop models
 Config.Instruments = {
     guitar = { animDict = "amb@world_human_musician@guitar@male@base", animName = "base", model = "prop_acc_guitar_01" },
     drums = { animDict = "amb@world_human_musician@drum@male@base", animName = "base", model = "prop_drum_01" },
@@ -26,7 +26,7 @@ Config.Instruments = {
 -- DJ Booth settings
 Config.DJBooth = {
     volumeStep = 0.1,
-    crossfadeTime = 2.0,  -- seconds
+    crossfadeTime = 2.0,
 }
 
 -- Stage Effects settings
@@ -36,11 +36,11 @@ Config.StageEffects = {
     fireworks = true,
 }
 
--- Additional Features Configurations
+-- Additional Features
 
--- More Realistic Performance System
+-- Realistic Performance System
 Config.DynamicStage = {
-    idleTimeThreshold = 5000, -- milliseconds of inactivity before crowd loses interest
+    idleTimeThreshold = 5000, -- ms before crowd loses interest
 }
 
 Config.SongRequests = {
@@ -48,27 +48,27 @@ Config.SongRequests = {
 }
 
 Config.AutoSync = {
-    enabled = true,  -- if multiple artists are performing, try to sync animations and music
+    enabled = true,
 }
 
 -- Advanced Streaming & Audio Processing
 Config.AudioCaching = {
     enabled = true,
-    cacheDuration = 3600, -- seconds to cache a frequently played song
+    cacheDuration = 3600, -- seconds
 }
 
 Config.LiveMic = {
-    enabled = true,  -- enable real-time voice for live freestyle/commentary (requires additional integration)
+    enabled = true,  -- requires additional integration (e.g. voice chat enhancement)
 }
 
 -- Event-Based Features
 Config.EventFeatures = {
     rapBattle = true,
-    randomEventChance = 0.1, -- chance to trigger a random event during performance
+    randomEventChance = 0.1,
     liveTalkShow = true,
 }
 
--- Performance Score UI (rating scale 1-10)
+-- Performance Score UI (rating 1-10)
 Config.PerformanceScoreUI = {
     ratingScale = 10,
 }

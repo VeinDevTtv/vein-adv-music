@@ -15,13 +15,13 @@ function LoadAnimDict(dict)
     end
 end
 
--- Send UI messages to React-based NUI
+-- Send messages to the React UI via NUI
 function OpenUI(action, payload)
     payload.action = action
     SendNUIMessage(payload)
 end
 
--- Start performance command with track URL parameter
+-- Command: /startperformance [track URL]
 RegisterCommand("startperformance", function(source, args)
     if isPerforming then
         QBCore.Functions.Notify("You're already performing!", "error")
@@ -40,11 +40,10 @@ RegisterCommand("startperformance", function(source, args)
     StartPerformance(currentTrackUrl)
 end, false)
 
--- Initiate performance: set up UI, play audio, trigger animations/effects, start mini-game, and monitor dynamic stage presence
 function StartPerformance(trackUrl)
     OpenUI("openPerformanceUI", { trackUrl = trackUrl })
 
-    -- Play track via audio resource (server caching is handled on the server)
+    -- Play track using an audio streaming resource (e.g., xsound)
     exports['xsound']:PlayUrlSound('performance', trackUrl, 0.5)
 
     -- Play instrument animation
@@ -59,7 +58,6 @@ function StartPerformance(trackUrl)
     MonitorDynamicStage()
 end
 
--- Monitor player activity for dynamic stage presence; update UI if idle too long
 function MonitorDynamicStage()
     Citizen.CreateThread(function()
         while isPerforming do
@@ -72,7 +70,6 @@ function MonitorDynamicStage()
     end)
 end
 
--- Trigger stage effects via server events
 function TriggerStageEffects()
     if Config.StageEffects.dynamicLighting then
         TriggerServerEvent('music:server:TriggerLightingEffects')
@@ -85,7 +82,6 @@ function TriggerStageEffects()
     end
 end
 
--- Mini-game: simple note-hitting simulation (Guitar Hero–style)
 function StartMiniGame()
     miniGameActive = true
     miniGameScore = 0
@@ -101,7 +97,7 @@ function StartMiniGame()
             local hit = false
 
             while (GetGameTimer() - noteStart) < (Config.MiniGame.noteTimingWindow or 1000) do
-                if IsControlJustPressed(0, 38) then -- [E] key
+                if IsControlJustPressed(0, 38) then
                     hit = true
                     lastActionTime = GetGameTimer()
                     break
@@ -123,7 +119,6 @@ function StartMiniGame()
     end)
 end
 
--- End performance: cleanup UI, audio, animations and open rating UI
 function EndPerformance()
     isPerforming = false
     SetNuiFocus(false, false)
@@ -135,13 +130,11 @@ function EndPerformance()
     OpenUI("openRatingUI", { maxRating = Config.PerformanceScoreUI.ratingScale })
 end
 
--- Donation notification from server
 RegisterNetEvent('music:client:DonationReceived', function(amount)
     QBCore.Functions.Notify("You received a donation of $" .. amount, "success")
     OpenUI("donationNotification", { amount = amount })
 end)
 
--- Stage Effects: Dynamic lighting using a screen effect
 RegisterNetEvent('music:client:TriggerLightingEffects', function()
     StartScreenEffect("HeistCelebPass", 0, false)
     Citizen.SetTimeout(5000, function() 
@@ -149,7 +142,6 @@ RegisterNetEvent('music:client:TriggerLightingEffects', function()
     end)
 end)
 
--- Stage Effects: Fog Machine using particle effects
 RegisterNetEvent('music:client:TriggerFogMachine', function()
     local ped = PlayerPedId()
     local pos = GetEntityCoords(ped)
@@ -164,7 +156,6 @@ RegisterNetEvent('music:client:TriggerFogMachine', function()
     end)
 end)
 
--- Stage Effects: Fireworks using non-looped particle effects
 RegisterNetEvent('music:client:TriggerFireworks', function()
     local ped = PlayerPedId()
     local pos = GetEntityCoords(ped)
@@ -176,7 +167,6 @@ RegisterNetEvent('music:client:TriggerFireworks', function()
     StartParticleFxNonLoopedAtCoord("scr_indep_firework_trailburst", pos.x, pos.y, pos.z + 10.0, 0.0, 0.0, 0.0, 1.0, false, false, false)
 end)
 
--- UI callbacks from the React NUI
 RegisterNUICallback('uiAction', function(data, cb)
     if data.action == "buyTicket" then
         TriggerServerEvent('music:server:BuyTicket', {})
@@ -197,7 +187,6 @@ RegisterNUICallback('uiAction', function(data, cb)
 end)
 
 -- Additional Commands
-
 RegisterCommand("songrequest", function(source, args)
     local requestUrl = args[1] or ""
     if requestUrl == "" then
@@ -257,19 +246,16 @@ RegisterCommand("musicawards", function(source, args)
     end
 end, false)
 
--- Listen for song request events from server
 RegisterNetEvent('music:client:SongRequest', function(requestData)
     QBCore.Functions.Notify("Song request received: " .. requestData.songUrl, "primary")
     OpenUI("songRequestReceived", { songUrl = requestData.songUrl, requester = requestData.requester })
 end)
 
--- Listen for song skip events from server
 RegisterNetEvent('music:client:SkipSong', function()
     QBCore.Functions.Notify("Song skipped!", "error")
     exports['xsound']:StopSound('performance')
 end)
 
--- Placeholder events for rap battle and talk show
 RegisterNetEvent('music:client:StartRapBattle', function(battleData)
     QBCore.Functions.Notify("Rap battle started by: " .. battleData.initiator, "primary")
     OpenUI("startRapBattle", { initiator = battleData.initiator })

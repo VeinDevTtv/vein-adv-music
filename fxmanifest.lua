@@ -2,7 +2,7 @@
 fx_version 'cerulean'
 games { 'gta5' }
 
-author 'Your Name'
+author 'Vein'
 description 'QBCore Music Performance System'
 version '1.0.0'
 
