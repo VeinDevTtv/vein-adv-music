@@ -2,9 +2,9 @@
 Config = {}
 
 -- General settings
-Config.DefaultDonationSplit = 0.7  -- 70% goes to the artist
-Config.DefaultTicketPrice = 50       -- Ticket price in in-game currency
-Config.DefaultMerchRevenue = 0.8     -- 80% revenue for merch sales
+Config.DefaultDonationSplit = 0.7       -- 70% goes to the artist
+Config.DefaultTicketPrice = 50            -- Ticket price in in-game currency
+Config.DefaultMerchRevenue = 0.8          -- 80% revenue for merch sales
 
 -- Database tables (ensure these tables exist in your DB)
 Config.DB = {
@@ -12,6 +12,7 @@ Config.DB = {
     ConcertsTable = "music_concerts",
     DonationsTable = "music_donations",
     MerchandiseTable = "music_merch",
+    PerformanceRatings = "music_performance_ratings",
 }
 
 -- Instrument settings: defines animation dictionaries, animation names, and associated prop models
@@ -35,15 +36,58 @@ Config.StageEffects = {
     fireworks = true,
 }
 
--- API Keys (for YouTube/SoundCloud advanced integration)
-Config.YouTubeAPIKey = "YOUR_YOUTUBE_API_KEY"
+-- Additional Features Configurations
 
--- UI settings
-Config.UIModernTheme = true
+-- More Realistic Performance System
+Config.DynamicStage = {
+    idleTimeThreshold = 5000, -- milliseconds of inactivity before crowd loses interest
+}
 
--- Mini-game settings for instrument play (Guitar Hero-style)
-Config.MiniGame = {
-    noteTimingWindow = 1000,  -- milliseconds allowed to hit a note
-    scorePerNote = 10,
-    totalNotes = 10,
+Config.SongRequests = {
+    maxRequests = 5,
+}
+
+Config.AutoSync = {
+    enabled = true,  -- if multiple artists are performing, try to sync animations and music
+}
+
+-- Advanced Streaming & Audio Processing
+Config.AudioCaching = {
+    enabled = true,
+    cacheDuration = 3600, -- seconds to cache a frequently played song
+}
+
+Config.LiveMic = {
+    enabled = true,  -- enable real-time voice for live freestyle/commentary (requires additional integration)
+}
+
+-- Event-Based Features
+Config.EventFeatures = {
+    rapBattle = true,
+    randomEventChance = 0.1, -- chance to trigger a random event during performance
+    liveTalkShow = true,
+}
+
+-- Performance Score UI (rating scale 1-10)
+Config.PerformanceScoreUI = {
+    ratingScale = 10,
+}
+
+-- Immersive Nightlife Experience
+Config.DJSystem = {
+    turntableUI = true,
+}
+
+Config.VirtualFestival = {
+    enabled = true,
+}
+
+Config.VIPPass = {
+    enabled = true,
+}
+
+-- Competitive & Social Features
+Config.Competitive = {
+    liveArtistRankings = true,
+    musicAwards = true,
 }

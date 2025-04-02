@@ -1,7 +1,10 @@
 -- server.lua
 local QBCore = exports['qb-core']:GetCoreObject()
 
--- Save performance data to the database
+-- For server-side audio caching (simple implementation)
+local AudioCache = {}
+
+-- Save performance data to database and cache the track if needed
 RegisterNetEvent('music:server:SavePerformance', function(performanceData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -10,8 +13,14 @@ RegisterNetEvent('music:server:SavePerformance', function(performanceData)
         local trackUrl = performanceData.trackUrl
         local performanceTime = os.time()
         
+        -- Save performance info
         exports.oxmysql:execute("INSERT INTO " .. Config.DB.ConcertsTable .. " (artist, track_url, performance_time) VALUES (?, ?, ?)", 
             {artist, trackUrl, performanceTime})
+
+        -- Cache song if enabled and not already cached
+        if Config.AudioCaching.enabled and not AudioCache[trackUrl] then
+            AudioCache[trackUrl] = { cachedAt = os.time(), url = trackUrl }
+        end
         
         TriggerClientEvent('QBCore:Notify', src, "Performance saved!", "success")
     end
@@ -30,7 +39,6 @@ RegisterNetEvent('music:server:SendDonation', function(donationData)
             artistCitizenId, donorName, amount, os.time()
         })
         
-        -- Notify the artist (using their source id, assumed passed in donationData.artistSource)
         TriggerClientEvent('music:client:DonationReceived', donationData.artistSource, amount)
         TriggerClientEvent('QBCore:Notify', src, "Donation sent!", "success")
     end
@@ -59,7 +67,6 @@ RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     if Player then
         local price = Config.DefaultTicketPrice
         if Player.Functions.RemoveMoney("cash", price) then
-            -- Optionally, add a ticket item to the player's inventory (integrate with ox_inventory)
             TriggerClientEvent('QBCore:Notify', src, "Ticket purchased!", "success")
         else
             TriggerClientEvent('QBCore:Notify', src, "Insufficient funds!", "error")
@@ -67,7 +74,53 @@ RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     end
 end)
 
--- Stage Effects events: these simply broadcast to all clients
+-- Song request handling
+RegisterNetEvent('music:server:SongRequest', function(requestData)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    if Player then
+        -- For simplicity, just relay the song request to the performer(s)
+        TriggerClientEvent('music:client:SongRequest', -1, requestData)
+        TriggerClientEvent('QBCore:Notify', src, "Song request sent!", "success")
+    end
+end)
+
+-- Song skipping event (for DJs/performers)
+RegisterNetEvent('music:server:SkipSong', function()
+    TriggerClientEvent('music:client:SkipSong', -1)
+end)
+
+-- Rap battle event (placeholder logic)
+RegisterNetEvent('music:server:StartRapBattle', function(battleData)
+    local src = source
+    -- Broadcast to all clients that a rap battle is starting
+    TriggerClientEvent('music:client:StartRapBattle', -1, battleData)
+end)
+
+-- Live Talk Show event (placeholder logic)
+RegisterNetEvent('music:server:StartTalkShow', function(showData)
+    local src = source
+    TriggerClientEvent('music:client:StartTalkShow', -1, showData)
+end)
+
+-- Update performance rating (after performance, rating 1-10)
+RegisterNetEvent('music:server:UpdatePerformanceRating', function(ratingData)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    if Player then
+        local citizenid = Player.PlayerData.citizenid
+        local rating = tonumber(ratingData.rating)
+        if rating and rating >= 1 and rating <= Config.PerformanceScoreUI.ratingScale then
+            exports.oxmysql:execute("INSERT INTO " .. Config.DB.PerformanceRatings .. " (citizenid, rating, timestamp) VALUES (?, ?, ?)", 
+                {citizenid, rating, os.time()})
+            TriggerClientEvent('QBCore:Notify', src, "Performance rated: " .. rating, "success")
+        else
+            TriggerClientEvent('QBCore:Notify', src, "Invalid rating!", "error")
+        end
+    end
+end)
+
+-- Stage Effects events: broadcast to all clients
 RegisterNetEvent('music:server:TriggerLightingEffects', function()
     TriggerClientEvent('music:client:TriggerLightingEffects', -1)
 end)
