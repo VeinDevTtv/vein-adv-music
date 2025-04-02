@@ -1,7 +1,7 @@
 -- server.lua
 local QBCore = exports['qb-core']:GetCoreObject()
 
--- For server-side audio caching (simple implementation)
+-- Server-side audio caching (simple implementation)
 local AudioCache = {}
 
 -- Save performance data to database and cache the track if needed
@@ -16,7 +16,7 @@ RegisterNetEvent('music:server:SavePerformance', function(performanceData)
         -- Save performance info
         exports.oxmysql:execute("INSERT INTO " .. Config.DB.ConcertsTable .. " (artist, track_url, performance_time) VALUES (?, ?, ?)", 
             {artist, trackUrl, performanceTime})
-
+        
         -- Cache song if enabled and not already cached
         if Config.AudioCaching.enabled and not AudioCache[trackUrl] then
             AudioCache[trackUrl] = { cachedAt = os.time(), url = trackUrl }
@@ -74,12 +74,12 @@ RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     end
 end)
 
--- Song request handling
+-- Song request handling: relay request to all performers
 RegisterNetEvent('music:server:SongRequest', function(requestData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     if Player then
-        -- For simplicity, just relay the song request to the performer(s)
+        -- For simplicity, relay the song request to all clients
         TriggerClientEvent('music:client:SongRequest', -1, requestData)
         TriggerClientEvent('QBCore:Notify', src, "Song request sent!", "success")
     end
@@ -103,7 +103,7 @@ RegisterNetEvent('music:server:StartTalkShow', function(showData)
     TriggerClientEvent('music:client:StartTalkShow', -1, showData)
 end)
 
--- Update performance rating (after performance, rating 1-10)
+-- Update performance rating (after performance, rating scale 1-10)
 RegisterNetEvent('music:server:UpdatePerformanceRating', function(ratingData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
