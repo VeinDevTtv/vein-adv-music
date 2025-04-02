@@ -31,7 +31,7 @@ A realistic music performance system designed for FiveM servers using QBCore. Th
 ## File Structure
 
 ```
-qbmusic/
+vein-adv-music/
 ├── fxmanifest.lua
 ├── config.lua
 ├── client.lua
@@ -111,8 +111,8 @@ CREATE TABLE IF NOT EXISTS `music_merch` (
    - For YouTube integration, obtain a valid YouTube API key and set it in `config.lua`.
 
 2. **Resource Installation:**
-   - Place the resource folder (e.g., `qbmusic`) in your server's `resources` directory.
-   - Add `ensure qbmusic` (or `start qbmusic`) to your server configuration file (server.cfg).
+   - Place the resource folder (e.g., `vein-adv-music`) in your server's `resources` directory.
+   - Add `ensure vein-adv-music` (or `start vein-adv-music`) to your server configuration file (server.cfg).
 
 3. **Database Configuration:**
    - Import the provided SQL code into your MySQL database to create the necessary tables.
