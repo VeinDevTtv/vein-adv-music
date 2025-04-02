@@ -90,6 +90,7 @@ A realistic music performance system designed for FiveM servers using QBCore. Th
    ```
 
 3. **Database Setup:**
+   The script will automatically create the necessary database tables on first run, but you can also manually set them up using the SQL below:
    ```sql
    -- Import the following SQL into your database
    CREATE TABLE IF NOT EXISTS `music_artists` (
@@ -118,40 +119,7 @@ A realistic music performance system designed for FiveM servers using QBCore. Th
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
    ```
 
-4. **Configuration:**
-   - Copy `config.example.lua` to `config.lua`
-   - Update the following settings in `config.lua`:
-     ```lua
-     Config = {}
-     
-     -- General Settings
-     Config.Debug = false
-     Config.DefaultVolume = 0.5
-     Config.MaxSimultaneousPerformances = 3
-     
-     -- Economy Settings
-     Config.TicketPrice = 100
-     Config.DonationMinAmount = 10
-     Config.DonationMaxAmount = 1000
-     Config.VenueShare = 0.3 -- 30% of earnings go to venue
-     
-     -- Performance Settings
-     Config.MaxPerformanceDuration = 3600 -- 1 hour in seconds
-     Config.MinPerformanceDuration = 300 -- 5 minutes in seconds
-     
-     -- VIP Settings
-     Config.VIPDiscount = 0.2 -- 20% discount for VIP members
-     Config.VIPExclusiveLocations = true
-     
-     -- Database Settings
-     Config.Database = {
-         TablePrefix = "music_",
-         AutoCleanup = true,
-         CleanupInterval = 7 -- days
-     }
-     ```
-
-5. **Server Configuration:**
+4. **Server Configuration:**
    Add the following to your `server.cfg`:
    ```cfg
    # Music Performance System
@@ -165,140 +133,289 @@ A realistic music performance system designed for FiveM servers using QBCore. Th
    ensure xsound
    ```
 
-## Usage Guide
+## Detailed Tutorial
 
-### Commands
+### Getting Started as a Performer
 
-1. **Basic Performance:**
-   ```
-   /startperformance [track URL] [instrument]
-   /stopperformance
-   /performancehelp
+1. **Finding a Venue**
+   - Look for designated performance areas in clubs, bars, or outdoor stages
+   - Some venues may require permission or booking through venue staff
+   - Public spaces are generally open for impromptu performances
+
+2. **Choosing Your Instrument**
+   - Each instrument has different animations and skill multipliers:
+     - Guitar (Default): Balanced performance with standard scoring
+     - Drums: Higher skill multiplier (1.2x) but more challenging timing
+     - Piano: Good skill multiplier (1.1x) with medium difficulty
+     - Microphone: Standard scoring, focus on vocals
+     - DJ: Highest skill multiplier (1.3x) with special mixing controls
+
+3. **Starting Your First Performance**
+   - Find a suitable location
+   - Prepare a valid track URL (YouTube or direct MP3)
+   - Use the command:
+     ```
+     /startperformance [track URL] [instrument]
+     ```
+   - Example:
+     ```
+     /startperformance https://www.youtube.com/watch?v=dQw4w9WgXcQ guitar
+     ```
+
+4. **During the Performance**
+   - The mini-game will automatically start
+   - Watch for the "Hit the note!" prompts
+   - Press [E] when prompted to hit notes
+   - Time your hits precisely - perfect timing gives 1.5x points!
+   - Interact with the crowd periodically (using [H] or UI buttons)
+   - Use special effects to enhance your performance (using [J] or UI)
+
+5. **Ending Your Performance**
+   - Your performance will end automatically after all notes are played
+   - You can manually end it with:
+     ```
+     /stopperformance
+     ```
+   - After ending, you'll be prompted to rate the performance
+   - Performance data (duration, score) is saved to the database
+
+### Understanding the Performance Mini-Game
+
+The mini-game is a rhythm-based system similar to Guitar Hero:
+
+1. **Basic Mechanics**
+   - Notes appear at timed intervals
+   - Press [E] when prompted to hit the note
+   - Each successful hit earns you points
+   - Missed notes don't deduct points but affect crowd mood
+
+2. **Scoring System**
+   - Base score per note: 10 points
+   - Perfect timing (within first 30% of timing window): 1.5x multiplier
+   - Instrument skill multiplier applies to all points
+   - Consecutive hits build combos (if enabled in config)
+
+3. **Difficulty Levels**
+   - Easy: Slower notes (0.7x speed), standard points
+   - Medium (Default): Normal speed, 1.5x points
+   - Hard: Faster notes (1.3x speed), 2x points
+   
+   To set difficulty (server owners only):
+   ```lua
+   Config.MiniGame.defaultDifficulty = "medium" -- Options: "easy", "medium", "hard"
    ```
 
-2. **DJ Mode:**
+4. **Crowd Reactions**
+   - Maintaining high scores keeps the crowd engaged
+   - Inactivity for 8 seconds triggers crowd boredom warnings
+   - Continued inactivity will end your performance prematurely
+   - Donations boost crowd mood
+
+### DJ Mode Tutorial
+
+DJ mode offers special features for club DJs:
+
+1. **Activating DJ Mode**
    ```
-   /djmode [on/off]
-   /djcontrols
-   /djqueue
+   /djmode on
    ```
 
-3. **Rap Battle:**
-   ```
-   /rapbattle [opponent]
-   /acceptbattle
-   /declinebattle
-   ```
+2. **DJ Deck Controls**
+   - Access the DJ interface with:
+     ```
+     /djcontrols
+     ```
+   - Features include:
+     - Volume control
+     - Crossfading between tracks
+     - Effects (boost bass, filters, etc.)
+     - Visualizer types (wave, bar, circle)
 
-4. **Talk Show:**
-   ```
-   /talkshow [start/stop]
-   /audience [react/leave]
-   ```
+3. **Managing Song Requests**
+   - View pending requests:
+     ```
+     /djqueue
+     ```
+   - Accept or reject requests through the UI
+   - Play the next requested song with:
+     ```
+     /skipsong
+     ```
 
-5. **Festival Mode:**
-   ```
-   /festivalmode [start/stop]
-   /festivaleffects
-   ```
+4. **DJ Performance Tips**
+   - Use crossfade for smooth transitions
+   - Apply effects at key moments
+   - Respond to audience requests
+   - Use visualizers that match the music style
 
-6. **VIP Commands:**
+### Special Events
+
+1. **Rap Battles**
+   - Challenge another player:
+     ```
+     /rapbattle [player ID or name]
+     ```
+   - The challenged player can accept with:
+     ```
+     /acceptbattle
+     ```
+   - Battle consists of alternating freestyle performances
+   - Audience votes for the winner
+
+2. **Talk Shows**
+   - Start a talk show:
+     ```
+     /talkshow start
+     ```
+   - Invite guests through the UI
+   - Audience can react with:
+     ```
+     /audience react [cheer/laugh/boo]
+     ```
+
+3. **Festival Mode**
+   - Server admins can activate festival mode:
+     ```
+     /festivalmode start
+     ```
+   - Multiple stages become available
+   - Special weather and visual effects activate
+   - Enhanced crowd sizes
+   - To trigger special festival effects:
+     ```
+     /festivaleffects [fireworks/confetti/strobe]
+     ```
+
+### VIP Features
+
+1. **Obtaining VIP Status**
+   - Purchase through configured shop or admin grant
+   - Default cost: $500
+   - Lasts for 7 days (configurable)
+
+2. **VIP Benefits**
+   - Backstage access to exclusive areas
+   - Discounted tickets (20% by default)
+   - Priority performance queue
+   - Exclusive items and effects
+   - Check benefits with:
+     ```
+     /vipbenefits
+     ```
+
+3. **Using VIP Access**
    ```
    /vipaccess
-   /vipbenefits
-   /vipqueue
    ```
 
-### Key Bindings
-- `[E]` - Hit notes during performance
-- `[F]` - Toggle performance UI
-- `[G]` - Toggle instrument selection
-- `[H]` - Toggle crowd interaction
-- `[J]` - Toggle effects menu
+## Advanced Configuration Guide
 
-### Performance Tips
+### Economy Configuration
 
-1. **Getting Started:**
-   - Choose your instrument type
-   - Select a suitable location
-   - Ensure you have the required permissions
-   - Check your equipment status
+Adjust the following in `config.lua` to balance your server's economy:
 
-2. **During Performance:**
-   - Watch for the note prompts
-   - Time your [E] key presses with the music
-   - Interact with the crowd using the UI
-   - Monitor your performance score
-   - Use effects strategically
-
-3. **Maximizing Tips:**
-   - Maintain high performance scores
-   - Engage with the crowd
-   - Use special effects strategically
-   - Choose popular songs
-   - Perform during peak hours
-
-## Development
-
-### UI Development
-```bash
-# Start development server
-cd vein-adv-music-ui
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
+```lua
+Config.Economy = {
+    DefaultDonationSplit = 0.7,            -- Artist's share of donations
+    VenueOwnerShare = 0.3,                 -- Venue's share of ticket sales
+    DefaultTicketPrice = 50,               -- Base ticket price
+    DonationMinAmount = 10,                -- Minimum donation amount
+    DonationMaxAmount = 1000,              -- Maximum donation amount
+    VenueRentalCost = 200,                 -- Cost to rent a venue
+    MerchMarkup = 0.8                      -- Merchandise profit margin
+}
 ```
 
-### Adding New Features
+### Performance Optimization
 
-1. **New UI Component:**
-   - Create a new component in `src/components/`
-   - Import and add to `App.jsx`
-   - Update the state management in `App.jsx`
-   - Add necessary styles
+For servers with performance concerns:
 
-2. **New Server Feature:**
-   - Add server-side logic in `server.lua`
-   - Update database schema if needed
-   - Add client-side handlers in `client.lua`
-   - Update configuration options
+```lua
+Config.PerformanceOptimization = {
+    LimitEffectsRange = 50.0,              -- Maximum effect render distance
+    MaxSimultaneousEffects = 3,            -- Limit concurrent effects
+    GpuParticleLimit = 100,                -- Maximum particles
+    ReduceEffectsOnLowFPS = true           -- Auto-reduce effects at low FPS
+}
+```
 
-## Troubleshooting
+### Mini-Game Customization
 
-### Common Issues
+Adjust difficulty and gameplay:
 
-1. **Performance Not Starting:**
-   - Check if the track URL is valid
-   - Ensure you have the required permissions
-   - Verify the audio streaming resource is running
-   - Check server console for errors
-   - Verify database connection
+```lua
+Config.MiniGame = {
+    enabled = true,                        -- Enable/disable mini-game
+    totalNotes = 15,                       -- Notes per performance
+    noteTimingWindow = 1000,               -- MS to hit each note
+    scorePerNote = 10,                     -- Base points per note
+    perfectHitBonus = 5,                   -- Extra points for perfect timing
+    comboMultiplier = true,                -- Enable combo system
+    difficultyLevels = {
+        easy = { speed = 0.7, points = 1.0 },
+        medium = { speed = 1.0, points = 1.5 },
+        hard = { speed = 1.3, points = 2.0 }
+    },
+    defaultDifficulty = "medium"           -- Default difficulty
+}
+```
 
-2. **UI Not Loading:**
-   - Check browser console for errors
-   - Verify the build process completed successfully
-   - Ensure all dependencies are installed
-   - Clear browser cache
-   - Check NUI callback registration
+## Troubleshooting Guide
 
-3. **Database Issues:**
-   - Verify database connection settings
-   - Check if tables are created correctly
-   - Ensure proper permissions are set
-   - Check for SQL errors in server console
-   - Verify database user permissions
+### Common Issues and Solutions
 
-4. **Audio Issues:**
-   - Check xsound configuration
-   - Verify audio permissions
-   - Check for conflicting audio resources
-   - Verify audio file format compatibility
+1. **Audio Not Playing**
+   - **Problem**: Track doesn't play when starting performance
+   - **Solutions**:
+     - Ensure xsound is properly installed and running
+     - Check if the URL is valid and accessible
+     - Try using a different audio format or host
+     - Verify the volume settings in config.lua
 
-## Support & Contributions
+2. **Animations Not Working**
+   - **Problem**: Character doesn't perform instrument animation
+   - **Solutions**:
+     - Ensure animation dictionaries are valid
+     - Try a different instrument
+     - Check for animation conflicts with other resources
+     - Restart the client if animations get stuck
+
+3. **Database Errors**
+   - **Problem**: Performance data not saving
+   - **Solutions**:
+     - Verify oxmysql is properly installed
+     - Check database connection settings
+     - Ensure tables exist with correct structure
+     - Look for SQL errors in server console
+
+4. **UI Issues**
+   - **Problem**: UI not appearing or responsive
+   - **Solutions**:
+     - Make sure UI is built properly (`npm run build`)
+     - Check for JavaScript errors in browser console (F8)
+     - Clear browser cache with `/clearnui`
+     - Verify NUI callbacks are properly registered
+
+5. **Performance Lag**
+   - **Problem**: Server or client lag during performances
+   - **Solutions**:
+     - Reduce particle effects in config
+     - Lower the MaxSimultaneousEffects setting
+     - Enable ReduceEffectsOnLowFPS option
+     - Limit the number of concurrent performances
+
+### Server Owner Diagnostics
+
+Run these commands as a server owner to diagnose issues:
+
+```
+/musicdebug on       # Enable detailed logging
+/musicstatus         # View system status and active performances
+/musicreset          # Reset any stuck performances (emergency use only)
+/musicrepair         # Attempt to repair database issues
+```
+
+## Support & Community
 
 - **Discord:** [Join our Discord server](https://discord.gg/your-invite)
 - **GitHub Issues:** [Report bugs or request features](https://github.com/yourusername/vein-adv-music/issues)
