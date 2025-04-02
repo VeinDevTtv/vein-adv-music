@@ -13,11 +13,9 @@ RegisterNetEvent('music:server:SavePerformance', function(performanceData)
         local trackUrl = performanceData.trackUrl
         local performanceTime = os.time()
         
-        -- Save performance info
         exports.oxmysql:execute("INSERT INTO " .. Config.DB.ConcertsTable .. " (artist, track_url, performance_time) VALUES (?, ?, ?)", 
             {artist, trackUrl, performanceTime})
         
-        -- Cache song if enabled and not already cached
         if Config.AudioCaching.enabled and not AudioCache[trackUrl] then
             AudioCache[trackUrl] = { cachedAt = os.time(), url = trackUrl }
         end
@@ -26,12 +24,12 @@ RegisterNetEvent('music:server:SavePerformance', function(performanceData)
     end
 end)
 
--- Handle donation events: donor sends money to an artist
+-- Donation event: donor sends money to an artist
 RegisterNetEvent('music:server:SendDonation', function(donationData)
     local src = source
     local donor = QBCore.Functions.GetPlayer(src)
     if donor then
-        local artistCitizenId = donationData.artistCitizenId -- The citizenid of the artist receiving the donation
+        local artistCitizenId = donationData.artistCitizenId
         local amount = donationData.amount
         local donorName = donor.PlayerData.charinfo.firstname .. " " .. donor.PlayerData.charinfo.lastname
         
@@ -44,7 +42,7 @@ RegisterNetEvent('music:server:SendDonation', function(donationData)
     end
 end)
 
--- Handle record contract signing by an artist with a record label
+-- Record contract signing
 RegisterNetEvent('music:server:SignRecordContract', function(contractData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -60,7 +58,7 @@ RegisterNetEvent('music:server:SignRecordContract', function(contractData)
     end
 end)
 
--- Handle concert ticket purchase events
+-- Concert ticket purchase
 RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -74,12 +72,11 @@ RegisterNetEvent('music:server:BuyTicket', function(ticketData)
     end
 end)
 
--- Song request handling: relay request to all performers
+-- Song request handling
 RegisterNetEvent('music:server:SongRequest', function(requestData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     if Player then
-        -- For simplicity, relay the song request to all clients
         TriggerClientEvent('music:client:SongRequest', -1, requestData)
         TriggerClientEvent('QBCore:Notify', src, "Song request sent!", "success")
     end
@@ -90,20 +87,19 @@ RegisterNetEvent('music:server:SkipSong', function()
     TriggerClientEvent('music:client:SkipSong', -1)
 end)
 
--- Rap battle event (placeholder logic)
+-- Rap battle event (placeholder)
 RegisterNetEvent('music:server:StartRapBattle', function(battleData)
     local src = source
-    -- Broadcast to all clients that a rap battle is starting
     TriggerClientEvent('music:client:StartRapBattle', -1, battleData)
 end)
 
--- Live Talk Show event (placeholder logic)
+-- Live talk show event (placeholder)
 RegisterNetEvent('music:server:StartTalkShow', function(showData)
     local src = source
     TriggerClientEvent('music:client:StartTalkShow', -1, showData)
 end)
 
--- Update performance rating (after performance, rating scale 1-10)
+-- Update performance rating (scale 1-10)
 RegisterNetEvent('music:server:UpdatePerformanceRating', function(ratingData)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)

@@ -2,7 +2,7 @@
 fx_version 'cerulean'
 games { 'gta5' }
 
-author 'Vein'
+author 'Your Name'
 description 'QBCore Music Performance System'
 version '1.0.0'
 
@@ -15,6 +15,7 @@ ui_page 'html/index.html'
 
 files {
     'html/index.html',
-    'html/style.css',
-    'html/script.js'
+    'html/static/js/*.js',
+    'html/static/css/*.css',
+    'html/static/media/*'
 }

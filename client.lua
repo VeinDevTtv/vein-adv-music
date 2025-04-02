@@ -5,7 +5,7 @@ local currentTrackUrl = ""
 local miniGameActive = false
 local miniGameScore = 0
 local lastActionTime = GetGameTimer()
-local instrument = "guitar"  -- Default instrument; can be dynamically chosen
+local instrument = "guitar"  -- Default instrument; can be chosen dynamically
 
 -- Utility: Load an animation dictionary
 function LoadAnimDict(dict)
@@ -13,6 +13,12 @@ function LoadAnimDict(dict)
     while not HasAnimDictLoaded(dict) do
         Citizen.Wait(10)
     end
+end
+
+-- Send UI messages to React-based NUI
+function OpenUI(action, payload)
+    payload.action = action
+    SendNUIMessage(payload)
 end
 
 -- Start performance command with track URL parameter
@@ -34,12 +40,11 @@ RegisterCommand("startperformance", function(source, args)
     StartPerformance(currentTrackUrl)
 end, false)
 
--- Initiate performance: set UI, play audio, trigger animations/effects, start mini-game, and monitor dynamic stage presence
+-- Initiate performance: set up UI, play audio, trigger animations/effects, start mini-game, and monitor dynamic stage presence
 function StartPerformance(trackUrl)
-    SetNuiFocus(true, true)
-    SendNUIMessage({action = "openPerformanceUI", trackUrl = trackUrl})
+    OpenUI("openPerformanceUI", { trackUrl = trackUrl })
 
-    -- Play track using xsound (with caching handled on server)
+    -- Play track via audio resource (server caching is handled on the server)
     exports['xsound']:PlayUrlSound('performance', trackUrl, 0.5)
 
     -- Play instrument animation
@@ -49,30 +54,25 @@ function StartPerformance(trackUrl)
         TaskPlayAnim(PlayerPedId(), instrumentData.animDict, instrumentData.animName, 8.0, -8.0, -1, 49, 0, false, false, false)
     end
 
-    -- Trigger stage effects
     TriggerStageEffects()
-
-    -- Start mini-game (Guitar Hero–style)
     StartMiniGame()
-
-    -- Monitor player activity for dynamic stage presence
     MonitorDynamicStage()
 end
 
--- Monitor player actions; if idle too long, simulate crowd losing interest
+-- Monitor player activity for dynamic stage presence; update UI if idle too long
 function MonitorDynamicStage()
     Citizen.CreateThread(function()
         while isPerforming do
             Citizen.Wait(1000)
             if GetGameTimer() - lastActionTime > Config.DynamicStage.idleTimeThreshold then
                 QBCore.Functions.Notify("The crowd is losing interest!", "error")
-                -- Optionally lower performance score or trigger a crowd reaction here
+                OpenUI("crowdReaction", { reaction = "boo" })
             end
         end
     end)
 end
 
--- Trigger stage effects by firing server events
+-- Trigger stage effects via server events
 function TriggerStageEffects()
     if Config.StageEffects.dynamicLighting then
         TriggerServerEvent('music:server:TriggerLightingEffects')
@@ -85,7 +85,7 @@ function TriggerStageEffects()
     end
 end
 
--- Mini-game: simple note-hitting simulation
+-- Mini-game: simple note-hitting simulation (Guitar Hero–style)
 function StartMiniGame()
     miniGameActive = true
     miniGameScore = 0
@@ -103,7 +103,7 @@ function StartMiniGame()
             while (GetGameTimer() - noteStart) < (Config.MiniGame.noteTimingWindow or 1000) do
                 if IsControlJustPressed(0, 38) then -- [E] key
                     hit = true
-                    lastActionTime = GetGameTimer() -- update activity
+                    lastActionTime = GetGameTimer()
                     break
                 end
                 Citizen.Wait(0)
@@ -112,6 +112,7 @@ function StartMiniGame()
             if hit then
                 miniGameScore = miniGameScore + (Config.MiniGame.scorePerNote or 10)
                 QBCore.Functions.Notify("Good hit! Score: " .. miniGameScore, "success")
+                OpenUI("updateScore", { score = miniGameScore })
             else
                 QBCore.Functions.Notify("Missed note!", "error")
             end
@@ -122,22 +123,22 @@ function StartMiniGame()
     end)
 end
 
--- End performance: clean up UI, audio, animations and open performance rating UI
+-- End performance: cleanup UI, audio, animations and open rating UI
 function EndPerformance()
     isPerforming = false
     SetNuiFocus(false, false)
-    SendNUIMessage({action = "closePerformanceUI"})
+    OpenUI("closePerformanceUI", {})
     exports['xsound']:StopSound('performance')
     ClearPedTasks(PlayerPedId())
     StopScreenEffect("HeistCelebPass")
 
-    -- Open UI for performance rating (scale 1-10)
-    SendNUIMessage({action = "openRatingUI", maxRating = Config.PerformanceScoreUI.ratingScale})
+    OpenUI("openRatingUI", { maxRating = Config.PerformanceScoreUI.ratingScale })
 end
 
 -- Donation notification from server
 RegisterNetEvent('music:client:DonationReceived', function(amount)
     QBCore.Functions.Notify("You received a donation of $" .. amount, "success")
+    OpenUI("donationNotification", { amount = amount })
 end)
 
 -- Stage Effects: Dynamic lighting using a screen effect
@@ -175,7 +176,7 @@ RegisterNetEvent('music:client:TriggerFireworks', function()
     StartParticleFxNonLoopedAtCoord("scr_indep_firework_trailburst", pos.x, pos.y, pos.z + 10.0, 0.0, 0.0, 0.0, 1.0, false, false, false)
 end)
 
--- UI callbacks for ticket purchase, record contract signing, performance rating, DJ mixing, etc.
+-- UI callbacks from the React NUI
 RegisterNUICallback('uiAction', function(data, cb)
     if data.action == "buyTicket" then
         TriggerServerEvent('music:server:BuyTicket', {})
@@ -184,15 +185,19 @@ RegisterNUICallback('uiAction', function(data, cb)
     elseif data.action == "ratePerformance" then
         TriggerServerEvent('music:server:UpdatePerformanceRating', {rating = data.rating})
     elseif data.action == "djMix" then
-        -- Handle DJ mixing events (placeholder implementation)
         QBCore.Functions.Notify("DJ mixing initiated!", "primary")
+    elseif data.action == "requestSong" then
+        if data.songUrl and data.songUrl ~= "" then
+            TriggerServerEvent('music:server:SongRequest', {songUrl = data.songUrl, requester = GetPlayerName(PlayerId())})
+        else
+            QBCore.Functions.Notify("Invalid song URL!", "error")
+        end
     end
     cb('ok')
 end)
 
--- New Commands for Additional Features
+-- Additional Commands
 
--- Command for song requests
 RegisterCommand("songrequest", function(source, args)
     local requestUrl = args[1] or ""
     if requestUrl == "" then
@@ -202,84 +207,75 @@ RegisterCommand("songrequest", function(source, args)
     TriggerServerEvent('music:server:SongRequest', {songUrl = requestUrl, requester = GetPlayerName(PlayerId())})
 end, false)
 
--- Command to skip current song (for DJs/performers)
 RegisterCommand("skipsong", function(source, args)
     TriggerServerEvent('music:server:SkipSong')
 end, false)
 
--- Command to start a rap battle (placeholder)
 RegisterCommand("rapbattle", function(source, args)
     if Config.EventFeatures.rapBattle then
         TriggerServerEvent('music:server:StartRapBattle', {initiator = GetPlayerName(PlayerId())})
     end
 end, false)
 
--- Command to start a live talk show (placeholder)
 RegisterCommand("talkshow", function(source, args)
     if Config.EventFeatures.liveTalkShow then
         TriggerServerEvent('music:server:StartTalkShow', {host = GetPlayerName(PlayerId())})
     end
 end, false)
 
--- Command for DJ mixing (opens DJ turntable UI if enabled)
 RegisterCommand("djmix", function(source, args)
     if Config.DJSystem.turntableUI then
-        SendNUIMessage({action = "openDJUI"})
+        OpenUI("openDJUI", {})
     end
 end, false)
 
--- Command for VIP pass usage (placeholder)
 RegisterCommand("vippass", function(source, args)
     if Config.VIPPass.enabled then
         QBCore.Functions.Notify("VIP backstage access granted!", "success")
-        -- Additional VIP backstage logic can be implemented here
+        OpenUI("vipAccess", {})
     end
 end, false)
 
--- Command for Virtual Festival Mode (placeholder)
 RegisterCommand("festival", function(source, args)
     if Config.VirtualFestival.enabled then
         QBCore.Functions.Notify("Welcome to the Virtual Festival!", "success")
-        -- Additional logic for managing multiple stage performances can be implemented here
+        OpenUI("festivalMode", {})
     end
 end, false)
 
--- Command to view live artist rankings (placeholder)
 RegisterCommand("rankings", function(source, args)
     if Config.Competitive.liveArtistRankings then
-        -- Fetch and display rankings from the database (placeholder implementation)
         QBCore.Functions.Notify("Displaying live artist rankings!", "primary")
+        OpenUI("showRankings", {})
     end
 end, false)
 
--- Command to trigger Music Awards System (placeholder)
 RegisterCommand("musicawards", function(source, args)
     if Config.Competitive.musicAwards then
         QBCore.Functions.Notify("Music Awards initiated! Vote for Best Artist and Best Song.", "primary")
-        -- Additional logic for award voting and reward distribution can be implemented here
+        OpenUI("musicAwards", {})
     end
 end, false)
 
--- Listen for song request events from the server to update UI or performance state
+-- Listen for song request events from server
 RegisterNetEvent('music:client:SongRequest', function(requestData)
     QBCore.Functions.Notify("Song request received: " .. requestData.songUrl, "primary")
-    -- Optionally update the performance playlist or UI here
+    OpenUI("songRequestReceived", { songUrl = requestData.songUrl, requester = requestData.requester })
 end)
 
--- Listen for song skip event from the server
+-- Listen for song skip events from server
 RegisterNetEvent('music:client:SkipSong', function()
     QBCore.Functions.Notify("Song skipped!", "error")
     exports['xsound']:StopSound('performance')
-    -- Optionally start the next song in a playlist if available
 end)
 
--- Placeholder events for rap battle and live talk show to trigger custom UIs/effects
+-- Placeholder events for rap battle and talk show
 RegisterNetEvent('music:client:StartRapBattle', function(battleData)
     QBCore.Functions.Notify("Rap battle started by: " .. battleData.initiator, "primary")
-    -- Implement rap battle UI and crowd voting mechanics here
+    OpenUI("startRapBattle", { initiator = battleData.initiator })
 end)
 
 RegisterNetEvent('music:client:StartTalkShow', function(showData)
     QBCore.Functions.Notify("Live Talk Show hosted by: " .. showData.host, "primary")
-    -- Implement live talk show conversation UI here
+    OpenUI("startTalkShow", { host = showData.host })
 end)
