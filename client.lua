@@ -6,22 +6,74 @@ local miniGameActive = false
 local miniGameScore = 0
 local lastActionTime = GetGameTimer()
 local instrument = "guitar"  -- Default instrument; can be chosen dynamically
+local effectHandles = {} -- Track particle effect handles for cleanup
 
--- Utility: Load an animation dictionary
+-- Utility: Load an animation dictionary with timeout to prevent hanging
 function LoadAnimDict(dict)
-    RequestAnimDict(dict)
-    while not HasAnimDictLoaded(dict) do
-        Citizen.Wait(10)
+    if not HasAnimDictLoaded(dict) then
+        RequestAnimDict(dict)
+        local timeout = GetGameTimer() + 5000 -- 5 second timeout
+        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
+        
+        if not HasAnimDictLoaded(dict) then
+            QBCore.Functions.Notify("Failed to load animation. Please try again.", "error")
+            return false
+        end
     end
+    return true
 end
 
--- Send messages to the React UI via NUI
+-- Properly handle focus for UI interactions
+function SetUIFocus(hasFocus)
+    SetNuiFocus(hasFocus, hasFocus)
+    SetNuiFocusKeepInput(not hasFocus)
+end
+
+-- Send messages to the React UI via NUI with added error handling
 function OpenUI(action, payload)
+    if not payload then payload = {} end
     payload.action = action
+    
+    -- Handle UI state transitions
+    if action == "openPerformanceUI" or action == "openDJUI" or action == "openRatingUI" then
+        SetUIFocus(true)
+    elseif action == "closePerformanceUI" then
+        SetUIFocus(false)
+    end
+    
     SendNUIMessage(payload)
 end
 
--- Command: /startperformance [track URL]
+-- Clean up any active resources
+function CleanupResources()
+    -- Stop animations
+    ClearPedTasks(PlayerPedId())
+    
+    -- Stop screen effects
+    StopScreenEffect("HeistCelebPass")
+    
+    -- Clean up any particle effects
+    for _, handle in pairs(effectHandles) do
+        if handle then
+            StopParticleFxLooped(handle, 0)
+        end
+    end
+    effectHandles = {}
+    
+    -- Clean up audio
+    if exports['xsound'] and exports['xsound'].soundExists('performance') then
+        exports['xsound']:StopSound('performance')
+    end
+    
+    -- Reset state
+    isPerforming = false
+    miniGameActive = false
+    SetUIFocus(false)
+end
+
+-- Command: /startperformance [track URL] [instrument type]
 RegisterCommand("startperformance", function(source, args)
     if isPerforming then
         QBCore.Functions.Notify("You're already performing!", "error")
@@ -33,24 +85,51 @@ RegisterCommand("startperformance", function(source, args)
         QBCore.Functions.Notify("Please provide a track URL.", "error")
         return
     end
+    
+    -- Allow choosing instrument from command
+    if args[2] and Config.Instruments[args[2]] then
+        instrument = args[2]
+    end
 
     isPerforming = true
     lastActionTime = GetGameTimer()
-    TriggerServerEvent('music:server:SavePerformance', {trackUrl = currentTrackUrl})
+    TriggerServerEvent('music:server:SavePerformance', {trackUrl = currentTrackUrl, instrument = instrument})
     StartPerformance(currentTrackUrl)
+end, false)
+
+-- Command to stop performance
+RegisterCommand("stopperformance", function(source, args)
+    if not isPerforming then
+        QBCore.Functions.Notify("You're not currently performing.", "error")
+        return
+    end
+    
+    EndPerformance()
+    QBCore.Functions.Notify("Performance ended.", "success")
 end, false)
 
 function StartPerformance(trackUrl)
     OpenUI("openPerformanceUI", { trackUrl = trackUrl })
 
-    -- Play track using an audio streaming resource (e.g., xsound)
-    exports['xsound']:PlayUrlSound('performance', trackUrl, 0.5)
+    -- Play track using an audio streaming resource with volume control and error handling
+    if exports['xsound'] then
+        local volume = Config.DefaultVolume or 0.5
+        exports['xsound']:PlayUrlSound('performance', trackUrl, volume, function(success)
+            if not success then
+                QBCore.Functions.Notify("Failed to play the track. Check the URL and try again.", "error")
+                EndPerformance()
+            end
+        end)
+    else
+        QBCore.Functions.Notify("xsound resource not found. Audio won't play.", "error")
+    end
 
     -- Play instrument animation
     local instrumentData = Config.Instruments[instrument]
     if instrumentData then
-        LoadAnimDict(instrumentData.animDict)
-        TaskPlayAnim(PlayerPedId(), instrumentData.animDict, instrumentData.animName, 8.0, -8.0, -1, 49, 0, false, false, false)
+        if LoadAnimDict(instrumentData.animDict) then
+            TaskPlayAnim(PlayerPedId(), instrumentData.animDict, instrumentData.animName, 8.0, -8.0, -1, 49, 0, false, false, false)
+        end
     end
 
     TriggerStageEffects()
@@ -65,6 +144,12 @@ function MonitorDynamicStage()
             if GetGameTimer() - lastActionTime > Config.DynamicStage.idleTimeThreshold then
                 QBCore.Functions.Notify("The crowd is losing interest!", "error")
                 OpenUI("crowdReaction", { reaction = "boo" })
+                -- Give the player a chance to recover before ending
+                if GetGameTimer() - lastActionTime > Config.DynamicStage.idleTimeThreshold * 2 then
+                    QBCore.Functions.Notify("The crowd has lost interest. Performance ended.", "error")
+                    EndPerformance()
+                    break
+                end
             end
         end
     end)
@@ -86,17 +171,27 @@ function StartMiniGame()
     miniGameActive = true
     miniGameScore = 0
     local totalNotes = Config.MiniGame and Config.MiniGame.totalNotes or 10
+    local noteTimingWindow = Config.MiniGame and Config.MiniGame.noteTimingWindow or 1000
+    local scorePerNote = Config.MiniGame and Config.MiniGame.scorePerNote or 10
 
     Citizen.CreateThread(function()
         for note = 1, totalNotes do
-            if not miniGameActive then break end
+            if not miniGameActive or not isPerforming then break end
 
-            Citizen.Wait(2000)
+            -- Dynamic difficulty - speed up as the game progresses
+            local waitTime = 2000 - (note * 50)
+            if waitTime < 800 then waitTime = 800 end
+            
+            Citizen.Wait(waitTime)
             QBCore.Functions.Notify("Hit the note! (Press [E])", "primary")
             local noteStart = GetGameTimer()
             local hit = false
 
-            while (GetGameTimer() - noteStart) < (Config.MiniGame.noteTimingWindow or 1000) do
+            while (GetGameTimer() - noteStart) < noteTimingWindow do
+                if not isPerforming then 
+                    break 
+                end
+                
                 if IsControlJustPressed(0, 38) then
                     hit = true
                     lastActionTime = GetGameTimer()
@@ -106,33 +201,43 @@ function StartMiniGame()
             end
 
             if hit then
-                miniGameScore = miniGameScore + (Config.MiniGame.scorePerNote or 10)
-                QBCore.Functions.Notify("Good hit! Score: " .. miniGameScore, "success")
+                -- Calculate score based on timing - perfect hits get bonus points
+                local timeElapsed = GetGameTimer() - noteStart
+                local timingMultiplier = 1.0
+                
+                if timeElapsed < (noteTimingWindow * 0.3) then
+                    timingMultiplier = 1.5
+                    QBCore.Functions.Notify("Perfect Hit!", "success")
+                end
+                
+                miniGameScore = miniGameScore + (scorePerNote * timingMultiplier)
+                QBCore.Functions.Notify("Score: " .. miniGameScore, "success")
                 OpenUI("updateScore", { score = miniGameScore })
             else
                 QBCore.Functions.Notify("Missed note!", "error")
             end
         end
+        
+        if isPerforming then
+            QBCore.Functions.Notify("Performance complete! Final Score: " .. miniGameScore, "success")
+            TriggerServerEvent('music:server:SavePerformanceScore', {score = miniGameScore})
+            OpenUI("openRatingUI", { maxRating = Config.PerformanceScoreUI.ratingScale })
+        end
         miniGameActive = false
-        QBCore.Functions.Notify("Performance ended! Final Score: " .. miniGameScore, "success")
-        EndPerformance()
     end)
 end
 
 function EndPerformance()
-    isPerforming = false
-    SetNuiFocus(false, false)
-    OpenUI("closePerformanceUI", {})
-    exports['xsound']:StopSound('performance')
-    ClearPedTasks(PlayerPedId())
-    StopScreenEffect("HeistCelebPass")
-
-    OpenUI("openRatingUI", { maxRating = Config.PerformanceScoreUI.ratingScale })
+    CleanupResources()
+    TriggerServerEvent('music:server:EndPerformance')
+    QBCore.Functions.Notify("Performance ended!", "primary")
 end
 
 RegisterNetEvent('music:client:DonationReceived', function(amount)
     QBCore.Functions.Notify("You received a donation of $" .. amount, "success")
     OpenUI("donationNotification", { amount = amount })
+    -- Boost crowd reaction
+    lastActionTime = GetGameTimer()
 end)
 
 RegisterNetEvent('music:client:TriggerLightingEffects', function()
@@ -145,35 +250,64 @@ end)
 RegisterNetEvent('music:client:TriggerFogMachine', function()
     local ped = PlayerPedId()
     local pos = GetEntityCoords(ped)
-    RequestNamedPtfxAsset("core")
-    while not HasNamedPtfxAssetLoaded("core") do
-        Citizen.Wait(10)
+    
+    if not HasNamedPtfxAssetLoaded("core") then
+        RequestNamedPtfxAsset("core")
+        local timeout = GetGameTimer() + 5000
+        while not HasNamedPtfxAssetLoaded("core") and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
     end
-    UseParticleFxAssetNextCall("core")
-    local fx = StartParticleFxLoopedAtCoord("exp_grd_flare", pos.x, pos.y, pos.z, 0.0, 0.0, 0.0, 1.0, false, false, false, false)
-    Citizen.SetTimeout(5000, function() 
-        StopParticleFxLooped(fx, 0) 
-    end)
+    
+    if HasNamedPtfxAssetLoaded("core") then
+        UseParticleFxAssetNextCall("core")
+        local fx = StartParticleFxLoopedAtCoord("exp_grd_flare", pos.x, pos.y, pos.z, 0.0, 0.0, 0.0, 1.0, false, false, false, false)
+        table.insert(effectHandles, fx)
+        Citizen.SetTimeout(5000, function() 
+            if fx then
+                StopParticleFxLooped(fx, 0)
+                for i, handle in ipairs(effectHandles) do
+                    if handle == fx then
+                        table.remove(effectHandles, i)
+                        break
+                    end
+                end
+            end
+        end)
+    end
 end)
 
 RegisterNetEvent('music:client:TriggerFireworks', function()
     local ped = PlayerPedId()
     local pos = GetEntityCoords(ped)
-    RequestNamedPtfxAsset("scr_indep_fireworks")
-    while not HasNamedPtfxAssetLoaded("scr_indep_fireworks") do
-        Citizen.Wait(10)
+    
+    if not HasNamedPtfxAssetLoaded("scr_indep_fireworks") then
+        RequestNamedPtfxAsset("scr_indep_fireworks")
+        local timeout = GetGameTimer() + 5000
+        while not HasNamedPtfxAssetLoaded("scr_indep_fireworks") and GetGameTimer() < timeout do
+            Citizen.Wait(10)
+        end
     end
-    UseParticleFxAssetNextCall("scr_indep_fireworks")
-    StartParticleFxNonLoopedAtCoord("scr_indep_firework_trailburst", pos.x, pos.y, pos.z + 10.0, 0.0, 0.0, 0.0, 1.0, false, false, false)
+    
+    if HasNamedPtfxAssetLoaded("scr_indep_fireworks") then
+        UseParticleFxAssetNextCall("scr_indep_fireworks")
+        StartParticleFxNonLoopedAtCoord("scr_indep_firework_trailburst", pos.x, pos.y, pos.z + 10.0, 0.0, 0.0, 0.0, 1.0, false, false, false)
+    end
 end)
 
 RegisterNUICallback('uiAction', function(data, cb)
+    if not data or not data.action then
+        cb('error')
+        return
+    end
+    
     if data.action == "buyTicket" then
         TriggerServerEvent('music:server:BuyTicket', {})
     elseif data.action == "signContract" then
         TriggerServerEvent('music:server:SignRecordContract', {label = data.label, terms = data.terms})
     elseif data.action == "ratePerformance" then
         TriggerServerEvent('music:server:UpdatePerformanceRating', {rating = data.rating})
+        SetUIFocus(false)
     elseif data.action == "djMix" then
         QBCore.Functions.Notify("DJ mixing initiated!", "primary")
     elseif data.action == "requestSong" then
@@ -182,8 +316,18 @@ RegisterNUICallback('uiAction', function(data, cb)
         else
             QBCore.Functions.Notify("Invalid song URL!", "error")
         end
+    elseif data.action == "closeUI" then
+        SetUIFocus(false)
     end
+    
     cb('ok')
+end)
+
+-- Resource cleanup on player drop or resource stop
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() == resourceName and isPerforming then
+        CleanupResources()
+    end
 end)
 
 -- Additional Commands
@@ -248,20 +392,9 @@ end, false)
 
 RegisterNetEvent('music:client:SongRequest', function(requestData)
     QBCore.Functions.Notify("Song request received: " .. requestData.songUrl, "primary")
-    OpenUI("songRequestReceived", { songUrl = requestData.songUrl, requester = requestData.requester })
 end)
 
-RegisterNetEvent('music:client:SkipSong', function()
-    QBCore.Functions.Notify("Song skipped!", "error")
-    exports['xsound']:StopSound('performance')
-end)
-
-RegisterNetEvent('music:client:StartRapBattle', function(battleData)
-    QBCore.Functions.Notify("Rap battle started by: " .. battleData.initiator, "primary")
-    OpenUI("startRapBattle", { initiator = battleData.initiator })
-end)
-
-RegisterNetEvent('music:client:StartTalkShow', function(showData)
-    QBCore.Functions.Notify("Live Talk Show hosted by: " .. showData.host, "primary")
-    OpenUI("startTalkShow", { host = showData.host })
-end)
+-- Help command
+RegisterCommand("performancehelp", function(source, args)
+    QBCore.Functions.Notify("Available commands: /startperformance, /stopperformance, /songrequest, /djmix, /rapbattle, /talkshow, /festival, /vippass, /rankings, /musicawards", "primary")
+end, false)
